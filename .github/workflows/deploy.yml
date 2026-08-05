@@ -37,7 +37,8 @@ jobs:
       run: |
 
          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-         -Dsonar.projectKey=harshitha-b01_New-Java-webapp-assignment-01
+         -Dsonar.projectKey=harshitha-b01_New-Java-webapp-assignment-01 \
+         -Dsonar.organization=harshitha-b01
        
 
     - name: Upload WAR Artifact
