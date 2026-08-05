@@ -124,61 +124,78 @@ jobs:
       
         echo "${{ secrets.EC2_SSH_KEY }}" > ec2-key.pem
         chmod 600 ec2-key.pem
-
+   
     - name: Install Java 21 and Tomcat
       run: |
 
-        ssh -i ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ env.PUBLIC_IP }} << 'EOF'
+       ssh -i ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ env.PUBLIC_IP }} << 'EOF'
 
-        # Update packages
-        sudo dnf update -y
+       set -e
 
-        # Install Java 21
-        sudo dnf install -y java-21-openjdk java-21-openjdk-devel
+       echo "===== Updating Server ====="
+       sudo dnf update -y
 
-        # Verify Java
-        java -version
+       echo "===== Installing Java 21 ====="
+       sudo dnf install -y java-21-openjdk java-21-openjdk-devel
 
-        # Install wget
-        sudo dnf install -y wget
+       java -version
 
-        # Download Tomcat only if not already installed
-        if [ ! -d /opt/tomcat ]; then
+       echo "===== Installing wget ====="
+       sudo dnf install -y wget
 
-          cd /opt
+       echo "===== Moving to /opt ====="
+       cd /opt
 
-          sudo wgethttps://archive.apache.org/dist/tomcat/tomcat-10/v10.1.42/bin/apache-tomcat-10.1.42.tar.gz
+       if [ ! -d "/opt/tomcat" ]; then
 
-          sudo tar -xzf apache-tomcat-10.1.42.tar.gz
+        echo "===== Downloading Tomcat ====="
 
-          sudo mv apache-tomcat-10.1.42 tomcat
+       sudo wget https://archive.apache.org/dist/tomcat/tomcat-10/v10.1.42/bin/apache-tomcat-10.1.42.tar.gz
 
-        fi
+       echo "===== Checking Download ====="
+       ls -lh /opt
 
-        # Make Tomcat scripts executable
-        sudo chmod +x /opt/tomcat/bin/*.sh
+       echo "===== Extracting Tomcat ====="
+       sudo tar -xzf apache-tomcat-10.1.42.tar.gz
 
-        # Enable firewalld
-        sudo systemctl enable firewalld
+       echo "===== Checking Extracted Folder ====="
+       ls -l /opt
 
-        sudo systemctl start firewalld
+       echo "===== Renaming Folder ====="
+       sudo mv apache-tomcat-10.1.42 /opt/tomcat
 
-        # Open Tomcat Port
-        sudo firewall-cmd --permanent --add-port=8080/tcp
+     else
 
-        sudo firewall-cmd --reload
+      echo "Tomcat already installed."
 
-        # Start Tomcat
-        sudo /opt/tomcat/bin/startup.sh
+     fi
 
-        # Verify Java
-        java -version
+     echo "===== Verify Tomcat Folder ====="
+     ls -l /opt
 
-        # Verify Tomcat
-        ps -ef | grep tomcat
+     ls -l /opt/tomcat
 
-        EOF
+     sudo chmod +x /opt/tomcat/bin/*.sh
 
+     sudo systemctl enable firewalld
+     sudo systemctl start firewalld
+
+     sudo firewall-cmd --permanent --add-port=8080/tcp
+     sudo firewall-cmd --reload
+
+     sudo /opt/tomcat/bin/startup.sh
+
+     sleep 10
+
+     ps -ef | grep tomcat
+
+     ls -l /opt/tomcat
+    
+     ls -l /opt/tomcat/webapps
+ 
+     sudo ss -tulnp | grep 8080 || true
+
+     EOF
 
     - name: Deploy WAR File
       run: |
