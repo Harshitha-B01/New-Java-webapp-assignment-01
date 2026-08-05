@@ -6,6 +6,8 @@ yum install java-21-openjdk java-21-openjdk-devel -y
 
 java -version
 
+sudo yum install wget -y
+
 cd /opt
 
 sudo wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.26/bin/apache-tomcat-10.1.26.tar.gz
