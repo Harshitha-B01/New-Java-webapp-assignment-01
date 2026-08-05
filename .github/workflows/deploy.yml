@@ -7,9 +7,7 @@ on:
 
 jobs:
 
-# ==================================================
 # CI - BUILD + SONAR SCAN
-# ==================================================
 
   build:
   
@@ -48,9 +46,7 @@ jobs:
         path: target/*.war
 
 
-# ==================================================
-# CD - AWS DEPLOYMENT
-# ==================================================
+# CD - AWS configuration
 
   deploy:
 
@@ -76,11 +72,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ap-south-2
 
-
-# --------------------------------------------------
-# Check Existing EC2
-# --------------------------------------------------
-
+# Check if EC2 is present
 
     - name: Check EC2 Instance
 
@@ -96,10 +88,7 @@ jobs:
 
         echo "Existing Instance: $INSTANCE_ID"
 
-
-# --------------------------------------------------
 # Create EC2 if not available
-# --------------------------------------------------
 
     - name: Create RedHat EC2
       if: env.INSTANCE_ID == ''
@@ -119,17 +108,13 @@ jobs:
 
         echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
         
-        
-# --------------------------------------------------
-# Wait for EC2
-# --------------------------------------------------
+# Wait for instance to create
 
     - name: Wait for EC2
       run: |
-          sleep 120
-# --------------------------------------------------
-# Get EC2 Public IP
-# --------------------------------------------------
+          sleep 60
+
+#  EC2- cReation
 
     - name: Get EC2 Public IP
       run: |
@@ -151,9 +136,8 @@ jobs:
         chmod 600 ec2-key.pem
 
 
-# --------------------------------------------------
-# Deploy WAR to Tomcat
-# --------------------------------------------------
+# Deploying WAR file to Tomcat
+
     - name: Install Java 21 and Tomcat
       run: |
 
@@ -226,9 +210,7 @@ jobs:
         sleep 10
         EOF
 
-# --------------------------------------------------
 # Display Application URL
-# --------------------------------------------------
 
     - name: Display Application URL
       run: |
