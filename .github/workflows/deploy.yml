@@ -7,10 +7,6 @@ on:
 
 jobs:
 
-# ==================================================
-# CI - BUILD + SONAR SCAN
-# ==================================================
-
   build:
   
     runs-on: ubuntu-latest
@@ -48,10 +44,6 @@ jobs:
         path: target/*.war
 
 
-# ==================================================
-# CD - AWS DEPLOYMENT
-# ==================================================
-
   deploy:
 
     needs: build
@@ -76,12 +68,6 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ap-south-2
 
-
-# --------------------------------------------------
-# Check Existing EC2
-# --------------------------------------------------
-
-
     - name: Check EC2 Instance
 
       run: |
@@ -96,11 +82,6 @@ jobs:
 
         echo "Existing Instance: $INSTANCE_ID"
 
-
-# --------------------------------------------------
-# Create EC2 if not available
-# --------------------------------------------------
-
     - name: Create RedHat EC2
       if: env.INSTANCE_ID == ''
       run: |
@@ -112,7 +93,6 @@ jobs:
         --security-group-ids sg-05232a653e5e623fa \
         --tag-specifications \
         'ResourceType=instance,Tags=[{Key=Name,Value=Tomcat-server1}]' \
-        --user-data file://install-tomcat.sh \
         --query 'Instances[0].InstanceId' \
         --output text)
 
@@ -120,17 +100,11 @@ jobs:
 
         echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
         
-        
-# --------------------------------------------------
-# Wait for EC2
-# --------------------------------------------------
 
     - name: Wait for EC2
       run: |
-          sleep 120
-# --------------------------------------------------
-# Get EC2 Public IP
-# --------------------------------------------------
+       aws ec2 wait instance-running --instance-ids ${{ env.INSTANCE_ID }}
+          sleep 60
 
     - name: Get EC2 Public IP
       run: |
@@ -151,10 +125,60 @@ jobs:
         echo "${{ secrets.EC2_SSH_KEY }}" > ec2-key.pem
         chmod 600 ec2-key.pem
 
+    - name: Install Java 21 and Tomcat
+      run: |
 
-# --------------------------------------------------
-# Deploy WAR to Tomcat
-# --------------------------------------------------
+        ssh -i ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ env.PUBLIC_IP }} << 'EOF'
+
+        # Update packages
+        sudo dnf update -y
+
+        # Install Java 21
+        sudo dnf install -y java-21-openjdk java-21-openjdk-devel
+
+        # Verify Java
+        java -version
+
+        # Install wget
+        sudo dnf install -y wget
+
+        # Download Tomcat only if not already installed
+        if [ ! -d /opt/tomcat ]; then
+
+          cd /opt
+
+          sudo wgethttps://archive.apache.org/dist/tomcat/tomcat-10/v10.1.42/bin/apache-tomcat-10.1.42.tar.gz
+
+          sudo tar -xzf apache-tomcat-10.1.42.tar.gz
+
+          sudo mv apache-tomcat-10.1.42 tomcat
+
+        fi
+
+        # Make Tomcat scripts executable
+        sudo chmod +x /opt/tomcat/bin/*.sh
+
+        # Enable firewalld
+        sudo systemctl enable firewalld
+
+        sudo systemctl start firewalld
+
+        # Open Tomcat Port
+        sudo firewall-cmd --permanent --add-port=8080/tcp
+
+        sudo firewall-cmd --reload
+
+        # Start Tomcat
+        sudo /opt/tomcat/bin/startup.sh
+
+        # Verify Java
+        java -version
+
+        # Verify Tomcat
+        ps -ef | grep tomcat
+
+        EOF
+
 
     - name: Deploy WAR File
       run: |
@@ -167,15 +191,23 @@ jobs:
     - name: Restart Tomcat
       run: |
 
-        ssh -i ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ env.PUBLIC_IP }} << EOF
-        /opt/tomcat/bin/shutdown.sh
-        sleep 10
-        /opt/tomcat/bin/startup.sh
-        EOF
+       ssh -i ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ env.PUBLIC_IP }} << 'EOF'
 
-# --------------------------------------------------
-# Display Application URL
-# --------------------------------------------------
+       sudo /opt/tomcat/bin/shutdown.sh || true
+
+       sleep 10
+
+       sudo /opt/tomcat/bin/startup.sh
+
+       EOF
+
+    - name: Verify Deployment
+      run: |
+
+        sleep 20
+
+        curl http://${{ env.PUBLIC_IP }}:8080/
+
 
     - name: Display Application URL
       run: |
