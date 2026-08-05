@@ -180,7 +180,9 @@ jobs:
        sudo mv apache-tomcat-9.0.109 tomcat
 
        ls -l /opt
-
+       
+       sudo chown -R ec2-user:ec2-user /opt/tomcat
+       
        sudo chmod +x /opt/tomcat/bin/*.sh
 
        cd /opt/tomcat/bin
@@ -189,9 +191,11 @@ jobs:
 
        ps -ef | grep tomcat
 
-       sudo systemctl enable firewalld
+       sudo yum install -y firewalld
 
        sudo systemctl start firewalld
+
+       sudo systemctl enable firewalld
 
        sudo firewall-cmd --permanent --add-port=8080/tcp
 
