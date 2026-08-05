@@ -160,7 +160,7 @@ jobs:
       run: |
 
         scp -i ec2-key.pem -o StrictHostKeyChecking=no \
-        .war \
+        *.war \
         ec2-user@${{ env.PUBLIC_IP }}:/opt/tomcat/webapps/
 
 
