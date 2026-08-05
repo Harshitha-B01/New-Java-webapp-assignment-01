@@ -111,7 +111,7 @@ jobs:
         --security-group-ids sg-05232a653e5e623fa \
         --tag-specifications \
         'ResourceType=instance,Tags=[{Key=Name,Value=Tomcat-server1}]' \
-        --user-data file://install-tomcat.sh \
+        --user-data file://scripts/install-tomcat.sh \
         --query 'Instances[0].InstanceId' \
         --output text)
 
