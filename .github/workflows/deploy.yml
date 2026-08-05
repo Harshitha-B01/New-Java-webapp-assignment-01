@@ -7,46 +7,50 @@ on:
 
 jobs:
 
-# ==========================================================
-# CI JOB
-# ==========================================================
+# ==================================================
+# CI - BUILD + SONAR SCAN
+# ==================================================
 
   build:
-
+  
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: maven
+    - name: Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+        cache: maven
 
-      - name: Build WAR
-        run: mvn clean package
+    - name: Build WAR File
+      run: |
+        mvn clean package
 
-      - name: SonarCloud Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-            -Dsonar.projectKey=harshitha-b01_New-Java-webapp-assignment-01 \
-            -Dsonar.organization=harshitha-b01
+    - name: SonarCloud Scan 
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
 
-      - name: Upload WAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-war
-          path: target/*.war
+         mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+         -Dsonar.projectKey=harshitha-b01_New-Java-webapp-assignment-01 \
+         -Dsonar.organization=harshitha-b01
+       
 
-# ==========================================================
-# CD JOB
-# ==========================================================
+    - name: Upload WAR Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: application-war
+        path: target/*.war
+
+
+# ==================================================
+# CD - AWS DEPLOYMENT
+# ==================================================
 
   deploy:
 
@@ -56,143 +60,126 @@ jobs:
 
     steps:
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Download WAR
+      uses: actions/download-artifact@v4
+      with:
+        name: application-war
 
-      - name: Download WAR
-        uses: actions/download-artifact@v4
-        with:
-          name: application-war
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-2
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-south-2
 
-# ==========================================================
-# CHECK EC2
-# ==========================================================
 
-      - name: Check Existing EC2
-        id: check_ec2
-        run: |
+# --------------------------------------------------
+# Check Existing EC2
+# --------------------------------------------------
 
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=Tomcat-server1" \
-                      "Name=instance-state-name,Values=running" \
-            --query "Reservations[].Instances[].InstanceId" \
-            --output text)
 
-          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+    - name: Check EC2 Instance
 
-          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "No EC2 instance found."
-          else
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Existing EC2: $INSTANCE_ID"
-          fi
+      run: |
 
-# ==========================================================
-# CREATE EC2
-# ==========================================================
+        INSTANCE_ID=$(aws ec2 describe-instances \
+        --filters "Name=tag:Name,Values=Tomcat-server1" \
+        "Name=instance-state-name,Values=running" \
+        --query "Reservations[*].Instances[*].InstanceId" \
+        --output text)
 
-      - name: Create EC2
-        if: steps.check_ec2.outputs.exists == 'false'
-        run: |
+        echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
 
-          INSTANCE_ID=$(aws ec2 run-instances \
-            --image-id ami-02e3c96eaee2fe306 \
-            --instance-type t3.micro \
-            --key-name key-1 \
-            --security-group-ids sg-05232a653e5e623fa \
-            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Tomcat-server1}]' \
-            --user-data file://.github/workflows/scripts/install-tomcat.sh \
-            --query "Instances[0].InstanceId" \
-            --output text)
+        echo "Existing Instance: $INSTANCE_ID"
 
-          echo "Created EC2: $INSTANCE_ID"
 
-          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+# --------------------------------------------------
+# Create EC2 if not available
+# --------------------------------------------------
 
-# ==========================================================
-# WAIT FOR EC2
-# ==========================================================
+    - name: Create RedHat EC2
+      if: env.INSTANCE_ID == ''
+      run: |
 
-      - name: Wait for Instance
-        run: |
+        INSTANCE_ID=$(aws ec2 run-instances \
+        --image-id ami-02e3c96eaee2fe306 \
+        --instance-type t3.micro \
+        --key-name key-1 \
+        --security-group-ids sg-05232a653e5e623fa \
+        --tag-specifications \
+        'ResourceType=instance,Tags=[{Key=Name,Value=Tomcat-server1}]' \
+        --user-data file://install-tomcat.sh \
+        --query 'Instances[0].InstanceId' \
+        --output text)
 
-          aws ec2 wait instance-running \
-            
+        echo "Created EC2: $INSTANCE_ID"
+
+        echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+        
+        
+# --------------------------------------------------
+# Wait for EC2
+# --------------------------------------------------
+
+    - name: Wait for EC2
+      run: |
           sleep 120
+# --------------------------------------------------
+# Get EC2 Public IP
+# --------------------------------------------------
 
-# ==========================================================
-# GET PUBLIC IP
-# ==========================================================
+    - name: Get EC2 Public IP
+      run: |
 
-      - name: Get Public IP
-        run: |
+        PUBLIC_IP=$(aws ec2 describe-instances \
+        --filters "Name=tag:Name,Values=Tomcat-server1" \
+        "Name=instance-state-name,Values=running" \
+        --query "Reservations[*].Instances[*].PublicIpAddress" \
+        --output text)
 
-          PUBLIC_IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ env.INSTANCE_ID }} \
-            --query "Reservations[0].Instances[0].PublicIpAddress" \
-            --output text)
+        echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
 
-          echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+        echo "Server IP: $PUBLIC_IP"
+        
+    - name: Configure SSH Key
+      run: |
+      
+        echo "${{ secrets.EC2_SSH_KEY }}" > ec2-key.pem
+        chmod 600 ec2-key.pem
 
-          echo "Public IP: $PUBLIC_IP"
 
-# ==========================================================
-# SSH KEY
-# ==========================================================
+# --------------------------------------------------
+# Deploy WAR to Tomcat
+# --------------------------------------------------
 
-      - name: Configure SSH Key
-        run: |
+    - name: Deploy WAR File
+      run: |
 
-          echo "${{ secrets.EC2_SSH_KEY }}" > ec2-key.pem
+        scp -i ec2-key.pem -o StrictHostKeyChecking=no \
+        *.war \
+        ec2-user@${{ env.PUBLIC_IP }}:/opt/tomcat/webapps/
 
-          chmod 600 ec2-key.pem
 
-# ==========================================================
-# DEPLOY WAR
-# ==========================================================
+    - name: Restart Tomcat
+      run: |
 
-      - name: Deploy WAR
-        run: |
+        ssh -i ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ env.PUBLIC_IP }} << EOF
+        /opt/tomcat/bin/shutdown.sh
+        sleep 10
+        /opt/tomcat/bin/startup.sh
+        EOF
 
-          scp -o StrictHostKeyChecking=no \
-              -i ec2-key.pem \
-              *.war \
-              ec2-user@${{ env.PUBLIC_IP }}:/opt/tomcat/webapps/
+# --------------------------------------------------
+# Display Application URL
+# --------------------------------------------------
 
-# ==========================================================
-# RESTART TOMCAT
-# ==========================================================
+    - name: Display Application URL
+      run: |
 
-      - name: Restart Tomcat
-        run: |
+        echo "Application is deployed successfully"
+        echo "Application URL: http://${{ env.PUBLIC_IP }}:8080/assignment1-harshitha"
 
-          ssh -o StrictHostKeyChecking=no \
-              -i ec2-key.pem \
-              ec2-user@${{ env.PUBLIC_IP }} << EOF
-
-          /opt/tomcat/bin/shutdown.sh || true
-
-          sleep 10
-
-          /opt/tomcat/bin/startup.sh
-
-          EOF
-
-# ==========================================================
-# APPLICATION URL
-# ==========================================================
-
-      - name: Display URL
-        run: |
-
-          echo "Deployment Successful"
-
-          echo "http://${{ env.PUBLIC_IP }}:8080/assignment1-harshitha"
