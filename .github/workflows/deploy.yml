@@ -219,9 +219,11 @@ jobs:
       run: |
 
         ssh -i ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ env.PUBLIC_IP }} << EOF
-        /opt/tomcat/bin/shutdown.sh
+        sudo chown -R ec2-user:ec2-user /opt/tomcat
+        /opt/tomcat/bin/shutdown.sh || true
         sleep 10
         /opt/tomcat/bin/startup.sh
+        sleep 10
         EOF
 
 # --------------------------------------------------
