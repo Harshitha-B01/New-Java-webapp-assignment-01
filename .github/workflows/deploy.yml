@@ -43,9 +43,8 @@ jobs:
         name: application-war
         path: target/*.war
 
-
   deploy:
-    needs: build
+    need: build
 
     runs-on: ubuntu-latest
 
