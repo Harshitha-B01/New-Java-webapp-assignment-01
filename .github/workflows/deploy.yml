@@ -33,7 +33,14 @@ jobs:
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
-        
+        if [ -z "$SONAR_TOKEN" ]; then
+        echo "TOKEN MISSING"
+        exit 1
+
+        else
+        echo "TOKEN FOUND"
+         fi
+         
          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
          -Dsonar.token="$secrets.SONAR_TOKEN" \
          -Dsonar.organization=Harshitha-b01 \ 
