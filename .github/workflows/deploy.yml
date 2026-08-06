@@ -31,11 +31,11 @@ jobs:
 
     - name: SonarCloud Scan 
       env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.sonar_token }}
       run: |
 
          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-         -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+         -Dsonar.token=${{ secrets.sonar_token }}
          -Dsonar.organization=Harshitha-b01 \
          -Dsonar.projectKey=Harshitha-B01_New-Java-webapp-assignment-01 \ 
          -Dsonar.host.url=https://sonarcloud.io/
