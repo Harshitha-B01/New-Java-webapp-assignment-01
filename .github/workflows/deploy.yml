@@ -30,6 +30,7 @@ jobs:
         mvn clean package
 
     - name: SonarCloud Scan 
+      run: mvn sonar:sonar
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
