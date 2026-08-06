@@ -36,6 +36,9 @@ jobs:
 
          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
          -Dsonar.projectKey=Harshitha-B01_New-Java-webapp-assignment-01 \ 
+         -Dsonar.organization=harshitha-b01 \
+         -Dsonar.host.url=https://sonarcloud.io/
+         -Dsonar.token=${{ secrets.SONAR_TOKEN }}
 
     - name: Upload WAR Artifact
       uses: actions/upload-artifact@v4
